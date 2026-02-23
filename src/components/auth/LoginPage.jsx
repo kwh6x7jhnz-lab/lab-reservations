@@ -33,17 +33,13 @@ export default function LoginPage() {
         setMessage('Account created! You can now sign in.')
         setMode('login')
       } else if (mode === 'forgot') {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', email)
-          .single()
-        if (!profile) throw new Error('No account found with that email address.')
-        await supabase.from('password_reset_requests').insert({
-          user_id: profile.id,
+        const { error } = await supabase.from('password_reset_requests').insert({
+          user_id: '00000000-0000-0000-0000-000000000000',
+          email: email,
           message: forgotMessage || null,
           status: 'pending',
         })
+        if (error) throw error
         setMessage('Reset request submitted! Your lab admin will set a temporary password for you.')
         setMode('login')
       }
