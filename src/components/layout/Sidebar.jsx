@@ -33,8 +33,7 @@ export default function Sidebar({ pendingCount }) {
     <aside style={{ width: 230, minHeight: '100vh', background: '#fff', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '20px 12px', position: 'fixed', left: 0, top: 0, bottom: 0, zIndex: 100, boxShadow: '2px 0 8px rgba(0,0,0,0.04)' }}>
 
       <div style={{ padding: '4px 10px 20px', borderBottom: '1px solid var(--border)', marginBottom: 12 }}>
-        <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', display: 'inline-block', marginBottom: 8 }}>
-          <img src={LILLY_LOGO} alt="Lilly" style={{ height: 44, objectFit: 'contain', display: 'block' }} />
+        <img src={LILLY_LOGO} alt="Lilly" style={{ height: 44, objectFit: 'contain', display: 'block', marginBottom: 8 }} />
         </div>
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', lineHeight: 1.3 }}>Lab Equipment Reservations</div>
       </div>
