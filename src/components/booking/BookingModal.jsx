@@ -85,6 +85,7 @@ export default function BookingModal({ equipment, onClose }) {
     setLoading(true)
     const { start, end } = buildTimes()
     if (end <= start) { toast('End time must be after start time', 'error'); setLoading(false); return }
+    if (conflicts.length > 0) { toast('This equipment is already booked during that time. Please choose a different time.', 'error'); setLoading(false); return }
 
     const status = equipment.approval_required ? 'pending' : 'approved'
     const bookingData = {
@@ -165,8 +166,8 @@ export default function BookingModal({ equipment, onClose }) {
         )}
 
         {conflicts.length > 0 && (
-          <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--warning)' }}>
-            ⚠️ <strong>{conflicts.length} conflict(s)</strong> with existing bookings in this time window.
+          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--danger)' }}>
+            🚫 <strong>This equipment is already booked</strong> during this time window. Please select a different date or time.
           </div>
         )}
 
@@ -269,7 +270,7 @@ export default function BookingModal({ equipment, onClose }) {
 
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
+            <button type="submit" className="btn btn-primary" disabled={loading || conflicts.length > 0}>
               {loading ? <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> : equipment.approval_required ? 'Submit Request' : 'Confirm Booking'}
             </button>
           </div>
