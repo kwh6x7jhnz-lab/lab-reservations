@@ -17,7 +17,7 @@ export default function PasswordResets() {
     const { data: requestData } = await supabase
       .from('password_reset_requests')
       .select('*')
-      .eq('status', 'pending')
+      .ilike('status', 'pending')
       .order('created_at', { ascending: true })
 
     if (!requestData) { setLoading(false); return }
