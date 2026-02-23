@@ -22,14 +22,23 @@ export default function PasswordResets() {
 
     if (!requestData) { setLoading(false); return }
 
-    const userIds = [...new Set(requestData.map(r => r.user_id))]
+    // For requests with a real user_id, try to get profile
+    const realUserIds = requestData
+      .filter(r => r.user_id !== '00000000-0000-0000-0000-000000000000')
+      .map(r => r.user_id)
+
     let profileMap = {}
-    if (userIds.length > 0) {
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('id', userIds)
+    if (realUserIds.length > 0) {
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('id', realUserIds)
       if (profiles) profiles.forEach(p => { profileMap[p.id] = p })
     }
 
-    setRequests(requestData.map(r => ({ ...r, profile: profileMap[r.user_id] || null })))
+    setRequests(requestData.map(r => ({
+      ...r,
+      profile: profileMap[r.user_id] || null,
+      displayEmail: r.email || profileMap[r.user_id]?.email || 'Unknown',
+      displayName: profileMap[r.user_id]?.full_name || r.email || 'Unknown User',
+    })))
     setLoading(false)
   }
 
@@ -38,6 +47,18 @@ export default function PasswordResets() {
     if (!tempPassword || tempPassword.length < 8) {
       toast('Please enter a temporary password (min 8 characters)', 'error')
       return
+    }
+
+    // Find the actual user_id by email if we used the placeholder
+    let userId = request.user_id
+    if (userId === '00000000-0000-0000-0000-000000000000') {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', request.email)
+        .single()
+      if (!profile) { toast('Could not find user account for this email', 'error'); return }
+      userId = profile.id
     }
 
     setProcessing(request.id)
@@ -51,7 +72,7 @@ export default function PasswordResets() {
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
-          userId: request.user_id,
+          userId,
           newPassword: tempPassword,
           requestId: request.id,
         }),
@@ -60,7 +81,7 @@ export default function PasswordResets() {
       if (result.error) throw new Error(result.error)
 
       setRequests(prev => prev.filter(r => r.id !== request.id))
-      toast(`Password reset for ${request.profile?.full_name}. Let them know their temp password.`, 'success')
+      toast(`Password reset for ${request.displayName}. Let them know their temp password.`, 'success')
     } catch (err) {
       toast(err.message, 'error')
     }
@@ -96,8 +117,8 @@ export default function PasswordResets() {
                 <Key size={18} color="var(--accent)" />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: 15 }}>{r.profile?.full_name || 'Unknown User'}</div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{r.profile?.email}</div>
+                <div style={{ fontWeight: 600, fontSize: 15 }}>{r.displayName}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{r.displayEmail}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Clock size={11} /> Requested {format(new Date(r.created_at), 'MMM d, h:mm a')}
                 </div>
