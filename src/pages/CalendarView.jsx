@@ -22,14 +22,33 @@ export default function CalendarView() {
       setLoading(true)
       const start = startOfMonth(currentMonth).toISOString()
       const end = endOfMonth(currentMonth).toISOString()
+
       const { data, error } = await supabase
         .from('bookings')
-        .select('*, equipment(name, location, floor_building, category, owner), profiles(full_name, email)')
+        .select('*, equipment(name, location, floor_building, category, owner)')
         .gte('start_time', start)
         .lte('start_time', end)
         .in('status', ['approved', 'pending', 'rejected'])
-      if (error) console.error('Calendar load error:', error)
-      setBookings(data || [])
+
+      if (error) {
+        console.error('Calendar load error:', error)
+        setLoading(false)
+        return
+      }
+
+      // Fetch user names separately
+      const userIds = [...new Set((data || []).map(b => b.user_id))]
+      let profileMap = {}
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', userIds)
+        if (profiles) profiles.forEach(p => { profileMap[p.id] = p })
+      }
+
+      const enriched = (data || []).map(b => ({ ...b, profiles: profileMap[b.user_id] || null }))
+      setBookings(enriched)
       setLoading(false)
     }
     load()
@@ -53,11 +72,7 @@ export default function CalendarView() {
     return true
   })
 
-  const bookingsOnDay = (day) => filteredBookings.filter(b => {
-    const bookingDate = new Date(b.start_time)
-    return isSameDay(bookingDate, day)
-  })
-
+  const bookingsOnDay = (day) => filteredBookings.filter(b => isSameDay(new Date(b.start_time), day))
   const selectedBookings = selectedDay ? bookingsOnDay(selectedDay) : []
   const activeFilters = (statusFilter !== 'all' ? 1 : 0) + (equipmentFilter ? 1 : 0) + (ownerFilter ? 1 : 0)
 
@@ -153,7 +168,7 @@ export default function CalendarView() {
             ) : selectedBookings.map(b => (
               <div key={b.id} style={{ padding: '12px', borderRadius: 8, background: STATUS_BG[b.status] || '#f8fafc', border: '1px solid ' + STATUS_COLORS[b.status] + '30' }}>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{b.equipment?.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{b.profiles?.full_name}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{b.profiles?.full_name || 'Unknown user'}</div>
                 <div style={{ fontSize: 11, fontFamily: 'Space Mono', color: 'var(--text-dim)', marginTop: 4 }}>
                   {format(new Date(b.start_time), 'h:mm a')} – {format(new Date(b.end_time), 'h:mm a')}
                 </div>
