@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ALLOWED_EMAIL_DOMAINS } from '../../lib/constants'
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
+import LILLY_LOGO from '../../lib/logo'
 
 export default function LoginPage() {
   const [mode, setMode] = useState('login')
@@ -38,10 +39,9 @@ export default function LoginPage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', background: 'linear-gradient(135deg, #fff5f5 0%, #fff0f0 100%)' }}>
       <div style={{ width: '100%', maxWidth: '420px' }}>
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 120, height: 60, background: '#fff', border: '1px solid rgba(208,33,42,0.15)', borderRadius: 16, marginBottom: 16, boxShadow: '0 4px 12px rgba(208,33,42,0.1)', padding: '8px 20px' }}>
-            <img src="/lilly-logo.png" alt="Lilly" style={{ height: 36, objectFit: 'contain' }} />
+          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 140, height: 64, background: '#fff', border: '1px solid rgba(208,33,42,0.15)', borderRadius: 16, marginBottom: 16, boxShadow: '0 4px 12px rgba(208,33,42,0.1)', padding: '10px 20px' }}>
+            <img src={LILLY_LOGO} alt="Lilly" style={{ height: 38, objectFit: 'contain' }} />
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text)' }}>Lab Equipment Reservations</h1>
           <p style={{ color: 'var(--text-muted)', marginTop: 6, fontSize: 14 }}>Eli Lilly — Internal Booking System</p>
