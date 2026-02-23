@@ -9,7 +9,6 @@ export default function PasswordResets() {
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(null)
-  const [tempPasswords, setTempPasswords] = useState({})
 
   useEffect(() => { load() }, [])
 
@@ -17,71 +16,39 @@ export default function PasswordResets() {
     const { data: requestData } = await supabase
       .from('password_reset_requests')
       .select('*')
-      .ilike('status', 'pending')
+      .eq('status', 'pending')
       .order('created_at', { ascending: true })
 
     if (!requestData) { setLoading(false); return }
 
-    // For requests with a real user_id, try to get profile
-    const realUserIds = requestData
-      .filter(r => r.user_id !== '00000000-0000-0000-0000-000000000000')
-      .map(r => r.user_id)
-
+    const emails = requestData.map(r => r.email).filter(Boolean)
     let profileMap = {}
-    if (realUserIds.length > 0) {
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('id', realUserIds)
-      if (profiles) profiles.forEach(p => { profileMap[p.id] = p })
+    if (emails.length > 0) {
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('email', emails)
+      if (profiles) profiles.forEach(p => { profileMap[p.email.toLowerCase()] = p })
     }
 
     setRequests(requestData.map(r => ({
       ...r,
-      profile: profileMap[r.user_id] || null,
-      displayEmail: r.email || profileMap[r.user_id]?.email || 'Unknown',
-      displayName: profileMap[r.user_id]?.full_name || r.email || 'Unknown User',
+      displayEmail: r.email || 'Unknown',
+      displayName: profileMap[r.email?.toLowerCase()]?.full_name || r.email || 'Unknown User',
     })))
     setLoading(false)
   }
 
-  async function handleReset(request) {
-    const tempPassword = tempPasswords[request.id]
-    if (!tempPassword || tempPassword.length < 8) {
-      toast('Please enter a temporary password (min 8 characters)', 'error')
-      return
-    }
-
-    // Find the actual user_id by email if we used the placeholder
-    let userId = request.user_id
-    if (userId === '00000000-0000-0000-0000-000000000000') {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .ilike('email', request.email)
-        .single()
-      if (!profile) { toast('Could not find user account for this email', 'error'); return }
-      userId = profile.id
-    }
-
+  async function approveReset(request) {
     setProcessing(request.id)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          userId,
-          newPassword: tempPassword,
-          requestId: request.id,
-        }),
-      })
-      const result = await response.json()
-      if (result.error) throw new Error(result.error)
+      const { data: profile } = await supabase.from('profiles').select('id').ilike('email', request.email).single()
+      if (!profile) throw new Error('Could not find user account for this email')
+
+      const { error } = await supabase.from('profiles').update({ must_change_password: true }).eq('id', profile.id)
+      if (error) throw error
+
+      await supabase.from('password_reset_requests').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', request.id)
 
       setRequests(prev => prev.filter(r => r.id !== request.id))
-      toast(`Password reset for ${request.displayName}. Let them know their temp password.`, 'success')
+      toast(`Reset approved for ${request.displayName}. They will be prompted to set a new password on next login.`, 'success')
     } catch (err) {
       toast(err.message, 'error')
     }
@@ -122,29 +89,16 @@ export default function PasswordResets() {
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Clock size={11} /> Requested {format(new Date(r.created_at), 'MMM d, h:mm a')}
                 </div>
-                {r.message && (
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8, fontStyle: 'italic', background: 'var(--bg-elevated)', padding: '6px 10px', borderRadius: 6 }}>
-                    "{r.message}"
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
-                  <input
-                    className="form-input"
-                    style={{ maxWidth: 240, fontSize: 13 }}
-                    type="text"
-                    placeholder="Set temporary password..."
-                    value={tempPasswords[r.id] || ''}
-                    onChange={e => setTempPasswords(prev => ({ ...prev, [r.id]: e.target.value }))}
-                  />
-                  <button className="btn btn-primary btn-sm" onClick={() => handleReset(r)} disabled={processing === r.id}>
-                    {processing === r.id
-                      ? <div className="spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} />
-                      : <><Key size={14} /> Set Password</>}
+                {r.message && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8, fontStyle: 'italic', background: 'var(--bg-elevated)', padding: '6px 10px', borderRadius: 6 }}>"{r.message}"</div>}
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  <button className="btn btn-primary btn-sm" onClick={() => approveReset(r)} disabled={processing === r.id}>
+                    {processing === r.id ? <div className="spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> : <><Key size={14} /> Approve Reset</>}
                   </button>
-                  <button className="btn btn-secondary btn-sm" onClick={() => dismissRequest(r.id)}>
+                  <button className="btn btn-secondary btn-sm" onClick={() => dismissRequest(r.id)} disabled={processing === r.id}>
                     <X size={14} /> Dismiss
                   </button>
                 </div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>ℹ️ User will be prompted to set a new password on their next login</div>
               </div>
             </div>
           ))}
