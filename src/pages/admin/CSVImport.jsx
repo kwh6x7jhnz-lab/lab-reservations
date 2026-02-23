@@ -2,28 +2,28 @@ import { useState, useCallback } from 'react'
 import Papa from 'papaparse'
 import { supabase } from '../../lib/supabase'
 import { useToast } from '../../hooks/useToast'
-import { CSV_COLUMNS } from '../../lib/constants'
-import { Upload, CheckCircle, AlertCircle, FileText } from 'lucide-react'
+import { Upload, FileText } from 'lucide-react'
 
-function normalizeHeader(h) {
-  return h.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').trim('_')
-}
+function mapRow(row) {
+  const assetTag = row['Instrument ID']?.trim() || null
+  const name = [row['Manufacturer'], row['Model']].filter(Boolean).join(' ').trim() || null
+  const location = row['Room']?.trim() || null
+  const floor = row['Floor']?.trim() || ''
+  const building = row['Building']?.trim() || ''
+  const floorBuilding = [floor ? 'Floor ' + floor : '', building].filter(Boolean).join(' — ') || null
+  const owner = row['Owner']?.trim() || null
+  const category = row['Instrument type']?.trim() || row['Instrument class']?.trim() || null
 
-function mapRow(row, headerMap) {
-  const mapped = {}
-  for (const [field, aliases] of Object.entries(CSV_COLUMNS)) {
-    const match = aliases.find(a => headerMap[a])
-    if (match && headerMap[match]) {
-      const val = row[headerMap[match]]?.trim()
-      if (field === 'training_required' || field === 'approval_required') {
-        mapped[field] = ['true', '1', 'yes', 'y'].includes((val || '').toLowerCase())
-      } else {
-        mapped[field] = val || null
-      }
-    }
-  }
-  mapped.is_active = true
-  return mapped
+  const notesParts = []
+  if (row['Serial Number']?.trim()) notesParts.push('Serial: ' + row['Serial Number'].trim())
+  if (row['System']?.trim()) notesParts.push('System: ' + row['System'].trim())
+  if (row['Instrument Service Group']?.trim()) notesParts.push('Service Group: ' + row['Instrument Service Group'].trim())
+  if (row['Site']?.trim()) notesParts.push('Site: ' + row['Site'].trim())
+  if (row['Department']?.trim()) notesParts.push('Dept: ' + row['Department'].trim())
+  if (row['Local name']?.trim()) notesParts.push('Local name: ' + row['Local name'].trim())
+  const notes = notesParts.join(' | ') || null
+
+  return { asset_tag: assetTag, name, location, floor_building: floorBuilding, category, owner, notes, training_required: false, approval_required: false, is_active: true }
 }
 
 export default function CSVImport() {
@@ -31,7 +31,7 @@ export default function CSVImport() {
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState([])
   const [headers, setHeaders] = useState([])
-  const [headerMap, setHeaderMap] = useState({})
+  const [parsedData, setParsedData] = useState([])
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [dragging, setDragging] = useState(false)
@@ -43,10 +43,8 @@ export default function CSVImport() {
       header: true,
       skipEmptyLines: true,
       complete: ({ data, meta }) => {
-        const normalized = {}
-        meta.fields.forEach(h => { normalized[normalizeHeader(h)] = h })
         setHeaders(meta.fields)
-        setHeaderMap(normalized)
+        setParsedData(data)
         setPreview(data.slice(0, 5))
       }
     })
@@ -61,39 +59,32 @@ export default function CSVImport() {
 
   async function handleImport() {
     setLoading(true)
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async ({ data }) => {
-        const rows = data.map(r => mapRow(r, headerMap)).filter(r => r.name || r.asset_tag)
-        let inserted = 0, updated = 0, errors = 0
+    const rows = parsedData.map(mapRow).filter(r => r.name || r.asset_tag)
+    let inserted = 0, errors = 0
 
-        const CHUNK = 100
-        for (let i = 0; i < rows.length; i += CHUNK) {
-          const chunk = rows.slice(i, i + CHUNK)
-          const { data: res, error } = await supabase.from('equipment')
-            .upsert(chunk, { onConflict: 'asset_tag', ignoreDuplicates: false })
-          if (error) { errors += chunk.length; console.error(error) }
-          else { inserted += chunk.length }
-        }
+    const CHUNK = 100
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const chunk = rows.slice(i, i + CHUNK)
+      const { error } = await supabase.from('equipment')
+        .upsert(chunk, { onConflict: 'asset_tag', ignoreDuplicates: false })
+      if (error) { errors += chunk.length; console.error(error) }
+      else { inserted += chunk.length }
+    }
 
-        setResult({ total: rows.length, inserted, errors })
-        setLoading(false)
-        toast(`Import complete: ${rows.length} rows processed`, 'success')
-      }
-    })
+    setResult({ total: rows.length, inserted, errors })
+    setLoading(false)
+    toast('Import complete: ' + rows.length + ' rows processed', errors > 0 ? 'error' : 'success')
   }
 
   return (
     <div className="page">
       <div className="page-header">
         <h1 className="page-title">CSV Import</h1>
-        <p className="page-subtitle">Upload equipment data. Existing records will be updated based on asset tag.</p>
+        <p className="page-subtitle">Upload your instrument CSV. Existing records update automatically based on Instrument ID.</p>
       </div>
 
       <div className="grid-2" style={{ gap: 24 }}>
         <div>
-          {/* Drop zone */}
           <div onDragOver={e => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={onDrop}
             style={{ border: '2px dashed ' + (dragging ? 'var(--accent)' : 'var(--border)'), borderRadius: 12, padding: 40, textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s', background: dragging ? 'var(--accent-glow)' : 'var(--bg-elevated)', marginBottom: 16 }}
             onClick={() => document.getElementById('csv-input').click()}>
@@ -107,18 +98,25 @@ export default function CSVImport() {
             <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16 }}>
               <FileText size={16} color="var(--accent)" />
               <span style={{ fontSize: 13, flex: 1 }}>{file.name}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{preview.length > 0 ? 'Ready' : 'Parsing...'}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{parsedData.length > 0 ? parsedData.length + ' rows ready' : 'Parsing...'}</span>
             </div>
           )}
 
-          {/* Column mapping info */}
           <div className="card" style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>Expected CSV Columns</div>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>How your columns are mapped</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {Object.entries(CSV_COLUMNS).map(([field, aliases]) => (
-                <div key={field} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
-                  <span style={{ fontFamily: 'Space Mono', fontSize: 11, background: 'var(--bg-elevated)', padding: '2px 8px', borderRadius: 4, color: 'var(--accent)', minWidth: 140 }}>{field}</span>
-                  <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>or: {aliases.slice(1, 3).join(', ')}</span>
+              {[
+                ['Instrument ID', 'Asset Tag'],
+                ['Manufacturer + Model', 'Equipment Name'],
+                ['Room', 'Location'],
+                ['Floor + Building', 'Floor / Building'],
+                ['Instrument type', 'Category'],
+                ['Owner', 'Owner'],
+                ['Serial, System, Dept...', 'Notes'],
+              ].map(([csv, db]) => (
+                <div key={csv} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+                  <span style={{ fontFamily: 'Space Mono', fontSize: 11, background: 'var(--bg-elevated)', padding: '2px 8px', borderRadius: 4, color: 'var(--accent)', minWidth: 160 }}>{csv}</span>
+                  <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>→ {db}</span>
                 </div>
               ))}
             </div>
@@ -126,13 +124,12 @@ export default function CSVImport() {
 
           {preview.length > 0 && (
             <button className="btn btn-primary w-full btn-lg" onClick={handleImport} disabled={loading} style={{ justifyContent: 'center' }}>
-              {loading ? <><div className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} /> Importing...</> : 'Import Equipment'}
+              {loading ? <><div className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} /> Importing {parsedData.length} rows...</> : 'Import ' + parsedData.length + ' Instruments'}
             </button>
           )}
         </div>
 
         <div>
-          {/* Result */}
           {result && (
             <div className="card" style={{ marginBottom: 16, borderColor: result.errors > 0 ? 'rgba(255,181,71,0.4)' : 'rgba(0,214,143,0.4)' }}>
               <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Import Results</div>
@@ -142,7 +139,7 @@ export default function CSVImport() {
                   <span style={{ fontFamily: 'Space Mono', fontWeight: 600 }}>{result.total}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Imported/Updated</span>
+                  <span style={{ color: 'var(--text-muted)' }}>Imported / Updated</span>
                   <span style={{ fontFamily: 'Space Mono', color: 'var(--success)', fontWeight: 600 }}>{result.inserted}</span>
                 </div>
                 {result.errors > 0 && (
@@ -155,7 +152,6 @@ export default function CSVImport() {
             </div>
           )}
 
-          {/* Preview table */}
           {preview.length > 0 && (
             <div className="card">
               <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>Preview (first 5 rows)</div>
