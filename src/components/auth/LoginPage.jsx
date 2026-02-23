@@ -9,6 +9,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
+  const [forgotMessage, setForgotMessage] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -31,6 +32,20 @@ export default function LoginPage() {
         if (error) throw error
         setMessage('Account created! You can now sign in.')
         setMode('login')
+      } else if (mode === 'forgot') {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', email)
+          .single()
+        if (!profile) throw new Error('No account found with that email address.')
+        await supabase.from('password_reset_requests').insert({
+          user_id: profile.id,
+          message: forgotMessage || null,
+          status: 'pending',
+        })
+        setMessage('Reset request submitted! Your lab admin will set a temporary password for you.')
+        setMode('login')
       }
     } catch (err) { setError(err.message) }
     setLoading(false)
@@ -49,7 +64,7 @@ export default function LoginPage() {
 
         <div className="card" style={{ padding: 32 }}>
           <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 24, color: 'var(--text)' }}>
-            {mode === 'login' ? 'Sign in to your account' : 'Create an account'}
+            {mode === 'login' ? 'Sign in to your account' : mode === 'register' ? 'Create an account' : 'Request Password Reset'}
           </h2>
 
           {error && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--danger)' }}>{error}</div>}
@@ -69,42 +84,38 @@ export default function LoginPage() {
                 <input className="form-input" style={{ paddingLeft: 38 }} type="email" placeholder="you@lilly.com" value={email} onChange={e => setEmail(e.target.value)} required />
               </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Password</label>
-              <div style={{ position: 'relative' }}>
-                <Lock size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
-                <input className="form-input" style={{ paddingLeft: 38, paddingRight: 38 }} type={showPass ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} />
-                <button type="button" onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
-                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
+            {mode !== 'forgot' && (
+              <div className="form-group">
+                <label className="form-label">Password</label>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
+                  <input className="form-input" style={{ paddingLeft: 38, paddingRight: 38 }} type={showPass ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} />
+                  <button type="button" onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
+                    {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
+            {mode === 'forgot' && (
+              <div className="form-group">
+                <label className="form-label">Message to admin (optional)</label>
+                <input className="form-input" type="text" placeholder="e.g. I forgot my password" value={forgotMessage} onChange={e => setForgotMessage(e.target.value)} />
+              </div>
+            )}
             <button className="btn btn-primary w-full btn-lg" type="submit" disabled={loading} style={{ marginTop: 4, justifyContent: 'center' }}>
-              {loading ? <div className="spinner" style={{ width: 18, height: 18, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> : <>{mode === 'login' ? 'Sign In' : 'Create Account'} <ArrowRight size={16} /></>}
+              {loading ? <div className="spinner" style={{ width: 18, height: 18, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> : <>{mode === 'login' ? 'Sign In' : mode === 'register' ? 'Create Account' : 'Submit Request'} <ArrowRight size={16} /></>}
             </button>
           </form>
 
-          <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
-            {mode === 'login' ? (
+          <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {mode === 'login' && (<>
+              <button className="btn btn-ghost btn-sm" style={{ color: 'var(--text-dim)', fontSize: 12 }} onClick={() => { setMode('forgot'); setError(''); setMessage('') }}>Forgot password?</button>
               <span>Don't have an account? <button className="btn btn-ghost btn-sm" style={{ color: 'var(--accent)' }} onClick={() => { setMode('register'); setError(''); setMessage('') }}>Sign up</button></span>
-            ) : (
-              <button className="btn btn-ghost btn-sm" onClick={() => { setMode('login'); setError(''); setMessage('') }}>Back to sign in</button>
-            )}
+            </>)}
+            {mode !== 'login' && <button className="btn btn-ghost btn-sm" onClick={() => { setMode('login'); setError(''); setMessage('') }}>Back to sign in</button>}
           </div>
-
-          {mode === 'login' && (
-            <div style={{ marginTop: 12, textAlign: 'center' }}>
-              <button className="btn btn-ghost btn-sm" style={{ fontSize: 12, color: 'var(--text-dim)' }}
-                onClick={() => alert('Please contact your lab admin to reset your password.')}>
-                Forgot password?
-              </button>
-            </div>
-          )}
         </div>
-
-        <p style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'var(--text-dim)' }}>
-          Only @lilly.com and @network.lilly.com emails are permitted
-        </p>
+        <p style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'var(--text-dim)' }}>Only @lilly.com and @network.lilly.com emails are permitted</p>
       </div>
     </div>
   )
