@@ -13,6 +13,7 @@ import AdminBookings from './pages/admin/AdminBookings'
 import AdminUsers from './pages/admin/AdminUsers'
 import AccountPage from './pages/AccountPage'
 import CSVImport from './pages/admin/CSVImport'
+import PasswordResets from './pages/admin/PasswordResets'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -46,6 +47,7 @@ function AppRoutes() {
         <Route path="/admin/bookings" element={<RequireRole role="admin"><AdminBookings /></RequireRole>} />
         <Route path="/admin/users" element={<RequireRole role="admin"><AdminUsers /></RequireRole>} />
         <Route path="/admin/import" element={<RequireRole role="admin"><CSVImport /></RequireRole>} />
+        <Route path="/admin/password-resets" element={<RequireRole role="admin"><PasswordResets /></RequireRole>} />
       </Route>
     </Routes>
   )
