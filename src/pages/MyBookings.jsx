@@ -3,12 +3,13 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
 import { generateICS, downloadICS } from '../lib/ics'
-import { Calendar, Download, X, Clock } from 'lucide-react'
+import { Calendar, Download, X, Edit2 } from 'lucide-react'
 import { format } from 'date-fns'
+import BookingModal from '../components/booking/BookingModal'
 
 const StatusBadge = ({ status }) => {
   const map = { pending: 'badge-yellow', approved: 'badge-green', rejected: 'badge-red', cancelled: 'badge-gray' }
-  return <span className={'badge ' + (map[status] || 'badge-gray')}>{status}</span>
+  return <span className={'badge ' + (map[status] || 'badge-gray')} style={{ textTransform: 'capitalize' }}>{status}</span>
 }
 
 export default function MyBookings() {
@@ -17,18 +18,18 @@ export default function MyBookings() {
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [editingBooking, setEditingBooking] = useState(null)
 
-  useEffect(() => {
-    async function load() {
-      const { data } = await supabase.from('bookings')
-        .select('*, equipment(name, asset_tag, location, floor_building)')
-        .eq('user_id', user.id)
-        .order('start_time', { ascending: false })
-      setBookings(data || [])
-      setLoading(false)
-    }
-    load()
-  }, [user])
+  useEffect(() => { load() }, [user])
+
+  async function load() {
+    const { data } = await supabase.from('bookings')
+      .select('*, equipment(id, name, asset_tag, location, floor_building, category, owner, approval_required, training_required)')
+      .eq('user_id', user.id)
+      .order('start_time', { ascending: false })
+    setBookings(data || [])
+    setLoading(false)
+  }
 
   async function cancelBooking(id) {
     if (!confirm('Cancel this booking?')) return
@@ -51,6 +52,8 @@ export default function MyBookings() {
     downloadICS(ics, 'reservation-' + booking.equipment?.asset_tag + '.ics')
   }
 
+  const isFuture = (b) => new Date(b.start_time) > new Date()
+  const canEdit = (b) => isFuture(b) && (b.status === 'pending' || b.status === 'approved')
   const filtered = filter === 'all' ? bookings : bookings.filter(b => b.status === filter)
 
   if (loading) return <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}><div className="spinner" /></div>
@@ -76,27 +79,40 @@ export default function MyBookings() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {filtered.map(b => (
-            <div key={b.id} className="card" style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            <div key={b.id} className="card" style={{ display: 'flex', gap: 16, alignItems: 'center', opacity: b.status === 'cancelled' || b.status === 'rejected' ? 0.7 : 1 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: 15 }}>{b.equipment?.name || 'Unknown'}</div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 3 }}>{b.equipment?.location} • {b.equipment?.floor_building}</div>
-                <div style={{ fontSize: 12, fontFamily: 'Space Mono', color: 'var(--text-dim)', marginTop: 4 }}>
-                  {format(new Date(b.start_time), 'MMM d, yyyy h:mm a')} → {format(new Date(b.end_time), 'h:mm a')}
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 3 }}>
+                  {b.equipment?.location}{b.equipment?.floor_building ? ' · ' + b.equipment.floor_building : ''}
                 </div>
-                {b.notes && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>{b.notes}</div>}
+                <div style={{ fontSize: 12, fontFamily: 'Space Mono', color: 'var(--text-dim)', marginTop: 4 }}>
+                  {format(new Date(b.start_time), 'MMM d, yyyy · h:mm a')} → {format(new Date(b.end_time), 'h:mm a')}
+                </div>
+                {b.notes && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>"{b.notes}"</div>}
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                 <StatusBadge status={b.status} />
                 {b.status === 'approved' && (
                   <button className="btn btn-secondary btn-sm" onClick={() => downloadCalendar(b)} title="Download .ics"><Download size={14} /></button>
                 )}
-                {(b.status === 'pending' || b.status === 'approved') && new Date(b.start_time) > new Date() && (
-                  <button className="btn btn-danger btn-sm" onClick={() => cancelBooking(b.id)}><X size={14} /></button>
+                {canEdit(b) && (
+                  <button className="btn btn-secondary btn-sm" onClick={() => setEditingBooking(b)} title="Edit booking"><Edit2 size={14} /></button>
+                )}
+                {canEdit(b) && (
+                  <button className="btn btn-sm" style={{ background: '#fef2f2', color: 'var(--danger)', border: '1px solid #fca5a5' }} onClick={() => cancelBooking(b.id)} title="Cancel booking"><X size={14} /></button>
                 )}
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {editingBooking && editingBooking.equipment && (
+        <BookingModal
+          equipment={editingBooking.equipment}
+          editBooking={editingBooking}
+          onClose={() => { setEditingBooking(null); load() }}
+        />
       )}
     </div>
   )
