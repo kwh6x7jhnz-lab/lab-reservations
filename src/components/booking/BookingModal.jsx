@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import { generateICS, downloadICS } from '../../lib/ics'
 import { BOOKING_TYPES, TIME_SLOTS } from '../../lib/constants'
-import { X, MapPin, Tag, AlertCircle, Calendar, Download } from 'lucide-react'
+import { X, MapPin, Tag, AlertCircle, Calendar, Download, Search, UserPlus } from 'lucide-react'
 import { format, addDays } from 'date-fns'
 
 export default function BookingModal({ equipment, onClose }) {
@@ -20,6 +20,10 @@ export default function BookingModal({ equipment, onClose }) {
   const [loading, setLoading] = useState(false)
   const [conflicts, setConflicts] = useState([])
   const [step, setStep] = useState('form')
+  const [additionalUsers, setAdditionalUsers] = useState([])
+  const [userSearch, setUserSearch] = useState('')
+  const [userResults, setUserResults] = useState([])
+  const [searchingUsers, setSearchingUsers] = useState(false)
 
   const buildTimes = () => {
     if (bookingType === BOOKING_TYPES.TIME_SLOT) {
@@ -51,28 +55,58 @@ export default function BookingModal({ equipment, onClose }) {
     checkConflicts()
   }, [date, endDate, startTime, endTime, bookingType, halfDay])
 
+  useEffect(() => {
+    if (!userSearch || userSearch.length < 2) { setUserResults([]); return }
+    const timer = setTimeout(async () => {
+      setSearchingUsers(true)
+      const { data } = await supabase.from('profiles')
+        .select('id, full_name, email')
+        .or('full_name.ilike.%' + userSearch + '%,email.ilike.%' + userSearch + '%')
+        .neq('id', user.id)
+        .limit(5)
+      setUserResults((data || []).filter(u => !additionalUsers.find(a => a.id === u.id)))
+      setSearchingUsers(false)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [userSearch, additionalUsers, user.id])
+
+  function addUser(u) {
+    setAdditionalUsers(prev => [...prev, u])
+    setUserSearch('')
+    setUserResults([])
+  }
+
+  function removeUser(id) {
+    setAdditionalUsers(prev => prev.filter(u => u.id !== id))
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setLoading(true)
     const { start, end } = buildTimes()
     if (end <= start) { toast('End time must be after start time', 'error'); setLoading(false); return }
 
-    const { error } = await supabase.from('bookings').insert({
+    const status = equipment.approval_required ? 'pending' : 'approved'
+    const bookingData = {
       equipment_id: equipment.id,
-      user_id: user.id,
       start_time: start.toISOString(),
       end_time: end.toISOString(),
       booking_type: bookingType,
       notes,
-      status: equipment.approval_required ? 'pending' : 'approved',
-    })
+      status,
+    }
 
+    const { error } = await supabase.from('bookings').insert({ ...bookingData, user_id: user.id })
     if (error) { toast(error.message, 'error'); setLoading(false); return }
+
+    if (additionalUsers.length > 0) {
+      await supabase.from('bookings').insert(additionalUsers.map(u => ({ ...bookingData, user_id: u.id })))
+    }
 
     if (!equipment.approval_required) {
       const icsContent = generateICS({
         title: 'Lab Equipment: ' + equipment.name,
-        description: 'Equipment: ' + equipment.name + '\nAsset Tag: ' + equipment.asset_tag + '\nLocation: ' + equipment.location + '\nNotes: ' + (notes || 'None'),
+        description: 'Equipment: ' + equipment.name + '\nAsset Tag: ' + equipment.asset_tag + '\nLocation: ' + equipment.location + (additionalUsers.length > 0 ? '\nAlso booked for: ' + additionalUsers.map(u => u.full_name).join(', ') : ''),
         location: (equipment.location || '') + ', ' + (equipment.floor_building || ''),
         startDate: start, endDate: end,
         organizerEmail: 'noreply@lilly.com',
@@ -88,17 +122,20 @@ export default function BookingModal({ equipment, onClose }) {
   if (step === 'success') return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()} style={{ textAlign: 'center' }}>
-        <div style={{ width: 56, height: 56, borderRadius: '50%', background: equipment.approval_required ? 'rgba(255,181,71,0.15)' : 'rgba(0,214,143,0.15)', border: '2px solid ' + (equipment.approval_required ? 'var(--warning)' : 'var(--success)'), display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+        <div style={{ width: 56, height: 56, borderRadius: '50%', background: equipment.approval_required ? 'rgba(180,83,9,0.1)' : 'rgba(10,124,78,0.1)', border: '2px solid ' + (equipment.approval_required ? 'var(--warning)' : 'var(--success)'), display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
           <Calendar size={24} color={equipment.approval_required ? 'var(--warning)' : 'var(--success)'} />
         </div>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>
           {equipment.approval_required ? 'Request Submitted!' : 'Booking Confirmed!'}
         </h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 24 }}>
-          {equipment.approval_required
-            ? 'Your request is pending approval. You will be notified once reviewed.'
-            : 'Your reservation is confirmed. A calendar invite (.ics) has been downloaded.'}
+        <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 8 }}>
+          {equipment.approval_required ? 'Your request is pending approval.' : 'Your reservation is confirmed. A calendar invite (.ics) has been downloaded.'}
         </p>
+        {additionalUsers.length > 0 && (
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16 }}>
+            Also booked for: <strong>{additionalUsers.map(u => u.full_name).join(', ')}</strong>
+          </p>
+        )}
         <button className="btn btn-primary" onClick={onClose}>Done</button>
       </div>
     </div>
@@ -106,7 +143,7 @@ export default function BookingModal({ equipment, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 620 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 600 }}>{equipment.name}</h2>
@@ -121,14 +158,14 @@ export default function BookingModal({ equipment, onClose }) {
         </div>
 
         {equipment.training_required && (
-          <div style={{ background: 'rgba(255,77,109,0.1)', border: '1px solid rgba(255,77,109,0.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--danger)', display: 'flex', gap: 8 }}>
+          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--danger)', display: 'flex', gap: 8 }}>
             <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
             <span><strong>Training required</strong> — contact the owner before using: {equipment.owner || 'see admin'}</span>
           </div>
         )}
 
         {conflicts.length > 0 && (
-          <div style={{ background: 'rgba(255,181,71,0.1)', border: '1px solid rgba(255,181,71,0.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--warning)' }}>
+          <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--warning)' }}>
             ⚠️ <strong>{conflicts.length} conflict(s)</strong> with existing bookings in this time window.
           </div>
         )}
@@ -187,12 +224,45 @@ export default function BookingModal({ equipment, onClose }) {
           )}
 
           <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><UserPlus size={13} /> Add Other Users to This Booking</label>
+            <div style={{ position: 'relative' }}>
+              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
+              <input className="form-input" style={{ paddingLeft: 32 }} placeholder="Search by name or email..." value={userSearch} onChange={e => setUserSearch(e.target.value)} />
+              {userResults.length > 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10, marginTop: 4 }}>
+                  {userResults.map(u => (
+                    <div key={u.id} onClick={() => addUser(u)} style={{ padding: '10px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14, borderBottom: '1px solid var(--border)' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                      <div>
+                        <div style={{ fontWeight: 500 }}>{u.full_name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{u.email}</div>
+                      </div>
+                      <span style={{ fontSize: 12, color: 'var(--accent)' }}>+ Add</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {additionalUsers.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                {additionalUsers.map(u => (
+                  <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--accent-glow)', border: '1px solid rgba(0,87,184,0.2)', borderRadius: 20, padding: '4px 10px', fontSize: 13 }}>
+                    <span style={{ color: 'var(--accent)', fontWeight: 500 }}>{u.full_name}</span>
+                    <button type="button" onClick={() => removeUser(u.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', padding: 0, display: 'flex' }}><X size={12} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="form-group">
             <label className="form-label">Notes (optional)</label>
             <textarea className="form-input" rows={3} placeholder="Purpose, experiment details..." value={notes} onChange={e => setNotes(e.target.value)} style={{ resize: 'vertical' }} />
           </div>
 
           {!equipment.approval_required && (
-            <div style={{ background: 'rgba(0,214,143,0.08)', border: '1px solid rgba(0,214,143,0.2)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--success)', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--success)', display: 'flex', gap: 8, alignItems: 'center' }}>
               <Download size={14} /> A .ics calendar invite will download automatically.
             </div>
           )}
@@ -200,7 +270,7 @@ export default function BookingModal({ equipment, onClose }) {
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> : equipment.approval_required ? 'Submit Request' : 'Confirm Booking'}
+              {loading ? <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> : equipment.approval_required ? 'Submit Request' : 'Confirm Booking'}
             </button>
           </div>
         </form>
