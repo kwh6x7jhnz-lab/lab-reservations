@@ -11,6 +11,7 @@ import ApprovalQueue from './pages/ApprovalQueue'
 import AdminEquipment from './pages/admin/AdminEquipment'
 import AdminBookings from './pages/admin/AdminBookings'
 import AdminUsers from './pages/admin/AdminUsers'
+import AccountPage from './pages/AccountPage'
 import CSVImport from './pages/admin/CSVImport'
 
 function RequireAuth({ children }) {
@@ -39,6 +40,7 @@ function AppRoutes() {
         <Route path="/equipment" element={<EquipmentList />} />
         <Route path="/calendar" element={<CalendarView />} />
         <Route path="/my-bookings" element={<MyBookings />} />
+        <Route path="/account" element={<AccountPage />} />
         <Route path="/approvals" element={<RequireRole role="approver"><ApprovalQueue /></RequireRole>} />
         <Route path="/admin/equipment" element={<RequireRole role="admin"><AdminEquipment /></RequireRole>} />
         <Route path="/admin/bookings" element={<RequireRole role="admin"><AdminBookings /></RequireRole>} />
