@@ -55,7 +55,7 @@ export default function PasswordResets() {
       const { data: profile } = await supabase
         .from('profiles')
         .select('id')
-        .eq('email', request.email)
+        .ilike('email', request.email)
         .single()
       if (!profile) { toast('Could not find user account for this email', 'error'); return }
       userId = profile.id
