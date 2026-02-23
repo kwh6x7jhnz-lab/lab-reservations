@@ -1,2 +1,2 @@
-import lillyLogo from '../../lilly-logo.png'
+import lillyLogo from '../lilly-logo.png'
 export default lillyLogo
