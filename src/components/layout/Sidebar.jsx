@@ -3,6 +3,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
 import { LayoutDashboard, Calendar, Package, ClipboardList, Users, Upload, LogOut, Bell, Settings, ChevronDown, User } from 'lucide-react'
 import { useState } from 'react'
+import LILLY_LOGO from '../../lib/logo'
 
 const NavItem = ({ to, icon: Icon, label, badge }) => (
   <NavLink to={to} style={({ isActive }) => ({
@@ -31,13 +32,11 @@ export default function Sidebar({ pendingCount }) {
   return (
     <aside style={{ width: 230, minHeight: '100vh', background: '#fff', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '20px 12px', position: 'fixed', left: 0, top: 0, bottom: 0, zIndex: 100, boxShadow: '2px 0 8px rgba(0,0,0,0.04)' }}>
 
-      {/* Logo & App Name */}
       <div style={{ padding: '4px 10px 20px', borderBottom: '1px solid var(--border)', marginBottom: 12 }}>
-        <img src="/lilly-logo.png" alt="Lilly" style={{ height: 32, marginBottom: 8 }} />
+        <img src={LILLY_LOGO} alt="Lilly" style={{ height: 32, marginBottom: 8, objectFit: 'contain' }} />
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', lineHeight: 1.3 }}>Lab Equipment Reservations</div>
       </div>
 
-      {/* Navigation */}
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: '4px 14px 6px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Main</div>
         <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" />
@@ -63,7 +62,6 @@ export default function Sidebar({ pendingCount }) {
         )}
       </nav>
 
-      {/* User dropdown */}
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, position: 'relative' }}>
         <button onClick={() => setShowUserMenu(!showUserMenu)}
           style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 10px', borderRadius: 8, background: showUserMenu ? 'var(--bg-elevated)' : 'none', border: 'none', cursor: 'pointer', transition: 'all 0.15s' }}>
