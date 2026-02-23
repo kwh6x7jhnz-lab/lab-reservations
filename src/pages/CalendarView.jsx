@@ -20,13 +20,14 @@ export default function CalendarView() {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const start = startOfMonth(currentMonth)
-      const end = endOfMonth(currentMonth)
-      const { data, error } = await supabase.from('bookings')
+      const start = startOfMonth(currentMonth).toISOString()
+      const end = endOfMonth(currentMonth).toISOString()
+      const { data, error } = await supabase
+        .from('bookings')
         .select('*, equipment(name, location, floor_building, category, owner), profiles(full_name, email)')
-        .or(`start_time.gte.${start.toISOString()},end_time.gte.${start.toISOString()}`)
-        .lte('start_time', end.toISOString())
-        .not('status', 'eq', 'cancelled')
+        .gte('start_time', start)
+        .lte('start_time', end)
+        .neq('status', 'cancelled')
       if (error) console.error('Calendar load error:', error)
       setBookings(data || [])
       setLoading(false)
@@ -53,9 +54,8 @@ export default function CalendarView() {
   })
 
   const bookingsOnDay = (day) => filteredBookings.filter(b => {
-    const start = new Date(b.start_time)
-    const end = new Date(b.end_time)
-    return isSameDay(start, day) || (start <= day && end >= day)
+    const bookingDate = new Date(b.start_time)
+    return isSameDay(bookingDate, day)
   })
 
   const selectedBookings = selectedDay ? bookingsOnDay(selectedDay) : []
@@ -137,6 +137,9 @@ export default function CalendarView() {
             })}
           </div>
           {loading && <div style={{ textAlign: 'center', marginTop: 16, color: 'var(--text-muted)', fontSize: 13 }}>Loading...</div>}
+          <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
+            {filteredBookings.length} booking{filteredBookings.length !== 1 ? 's' : ''} loaded this month
+          </div>
         </div>
 
         {selectedDay && (
