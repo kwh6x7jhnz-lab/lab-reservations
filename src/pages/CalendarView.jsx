@@ -27,7 +27,7 @@ export default function CalendarView() {
         .select('*, equipment(name, location, floor_building, category, owner), profiles(full_name, email)')
         .gte('start_time', start)
         .lte('start_time', end)
-        .neq('status', 'cancelled')
+        .in('status', ['approved', 'pending', 'rejected'])
       if (error) console.error('Calendar load error:', error)
       setBookings(data || [])
       setLoading(false)
