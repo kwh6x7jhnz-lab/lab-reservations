@@ -4,17 +4,22 @@ import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import { generateICS, downloadICS } from '../../lib/ics'
 import { BOOKING_TYPES, TIME_SLOTS } from '../../lib/constants'
-import { X, MapPin, Tag, AlertCircle, Calendar, Download, Search, UserPlus } from 'lucide-react'
+import { X, MapPin, AlertCircle, Calendar, Download, Search, UserPlus } from 'lucide-react'
 import { format, addDays } from 'date-fns'
 
-export default function BookingModal({ equipment, onClose }) {
-  const { user, profile } = useAuth()
+export default function BookingModal({ equipment, onClose, prefillDate, prefillStartTime, prefillEndTime }) {
+  const { user } = useAuth()
   const toast = useToast()
+
+  const initDate = prefillDate ? format(new Date(prefillDate), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')
+  const initStartTime = prefillStartTime ? format(new Date(prefillStartTime), 'HH:mm') : '09:00'
+  const initEndTime = prefillEndTime ? format(new Date(prefillEndTime), 'HH:mm') : '11:00'
+
   const [bookingType, setBookingType] = useState(BOOKING_TYPES.TIME_SLOT)
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [endDate, setEndDate] = useState(format(addDays(new Date(), 1), 'yyyy-MM-dd'))
-  const [startTime, setStartTime] = useState('09:00')
-  const [endTime, setEndTime] = useState('11:00')
+  const [date, setDate] = useState(initDate)
+  const [endDate, setEndDate] = useState(format(addDays(new Date(initDate), 1), 'yyyy-MM-dd'))
+  const [startTime, setStartTime] = useState(initStartTime)
+  const [endTime, setEndTime] = useState(initEndTime)
   const [halfDay, setHalfDay] = useState('AM')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
@@ -23,7 +28,6 @@ export default function BookingModal({ equipment, onClose }) {
   const [additionalUsers, setAdditionalUsers] = useState([])
   const [userSearch, setUserSearch] = useState('')
   const [userResults, setUserResults] = useState([])
-  const [searchingUsers, setSearchingUsers] = useState(false)
 
   const buildTimes = () => {
     if (bookingType === BOOKING_TYPES.TIME_SLOT) {
@@ -44,7 +48,7 @@ export default function BookingModal({ equipment, onClose }) {
       try {
         const { start, end } = buildTimes()
         const { data } = await supabase.from('bookings')
-          .select('*, profiles(full_name)')
+          .select('id')
           .eq('equipment_id', equipment.id)
           .in('status', ['approved', 'pending'])
           .lt('start_time', end.toISOString())
@@ -58,27 +62,18 @@ export default function BookingModal({ equipment, onClose }) {
   useEffect(() => {
     if (!userSearch || userSearch.length < 2) { setUserResults([]); return }
     const timer = setTimeout(async () => {
-      setSearchingUsers(true)
       const { data } = await supabase.from('profiles')
         .select('id, full_name, email')
         .or('full_name.ilike.%' + userSearch + '%,email.ilike.%' + userSearch + '%')
         .neq('id', user.id)
         .limit(5)
       setUserResults((data || []).filter(u => !additionalUsers.find(a => a.id === u.id)))
-      setSearchingUsers(false)
     }, 300)
     return () => clearTimeout(timer)
   }, [userSearch, additionalUsers, user.id])
 
-  function addUser(u) {
-    setAdditionalUsers(prev => [...prev, u])
-    setUserSearch('')
-    setUserResults([])
-  }
-
-  function removeUser(id) {
-    setAdditionalUsers(prev => prev.filter(u => u.id !== id))
-  }
+  function addUser(u) { setAdditionalUsers(prev => [...prev, u]); setUserSearch(''); setUserResults([]) }
+  function removeUser(id) { setAdditionalUsers(prev => prev.filter(u => u.id !== id)) }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -126,11 +121,9 @@ export default function BookingModal({ equipment, onClose }) {
         <div style={{ width: 56, height: 56, borderRadius: '50%', background: equipment.approval_required ? 'rgba(180,83,9,0.1)' : 'rgba(10,124,78,0.1)', border: '2px solid ' + (equipment.approval_required ? 'var(--warning)' : 'var(--success)'), display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
           <Calendar size={24} color={equipment.approval_required ? 'var(--warning)' : 'var(--success)'} />
         </div>
-        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>
-          {equipment.approval_required ? 'Request Submitted!' : 'Booking Confirmed!'}
-        </h2>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>{equipment.approval_required ? 'Request Submitted!' : 'Booking Confirmed!'}</h2>
         <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 8 }}>
-          {equipment.approval_required ? 'Your request is pending approval.' : 'Your reservation is confirmed. A calendar invite (.ics) has been downloaded.'}
+          {equipment.approval_required ? 'Your request is pending approval.' : 'Your reservation is confirmed. A .ics calendar invite has been downloaded.'}
         </p>
         {additionalUsers.length > 0 && (
           <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16 }}>
@@ -167,7 +160,7 @@ export default function BookingModal({ equipment, onClose }) {
 
         {conflicts.length > 0 && (
           <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--danger)' }}>
-            🚫 <strong>This equipment is already booked</strong> during this time window. Please select a different date or time.
+            🚫 <strong>This equipment is already booked</strong> during this time. Please select a different date or time.
           </div>
         )}
 
@@ -232,7 +225,7 @@ export default function BookingModal({ equipment, onClose }) {
               {userResults.length > 0 && (
                 <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10, marginTop: 4 }}>
                   {userResults.map(u => (
-                    <div key={u.id} onClick={() => addUser(u)} style={{ padding: '10px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14, borderBottom: '1px solid var(--border)' }}
+                    <div key={u.id} onClick={() => addUser(u)} style={{ padding: '10px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14, borderBottom: '1px solid var(--border)', background: '#fff' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
                       onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
                       <div>
