@@ -1,7 +1,8 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
-import { Beaker, LayoutDashboard, Calendar, Package, ClipboardList, Users, Upload, LogOut, Bell, Settings } from 'lucide-react'
+import { LayoutDashboard, Calendar, Package, ClipboardList, Users, Upload, LogOut, Bell, Settings, ChevronDown, User } from 'lucide-react'
+import { useState } from 'react'
 
 const NavItem = ({ to, icon: Icon, label, badge }) => (
   <NavLink to={to} style={({ isActive }) => ({
@@ -9,7 +10,7 @@ const NavItem = ({ to, icon: Icon, label, badge }) => (
     textDecoration: 'none', fontSize: 14, fontWeight: 500, transition: 'all 0.15s',
     color: isActive ? 'var(--accent)' : 'var(--text-muted)',
     background: isActive ? 'var(--accent-glow)' : 'transparent',
-    border: isActive ? '1px solid rgba(0,87,184,0.2)' : '1px solid transparent',
+    border: isActive ? '1px solid rgba(208,33,42,0.2)' : '1px solid transparent',
   })}>
     <Icon size={17} />
     <span style={{ flex: 1 }}>{label}</span>
@@ -20,6 +21,7 @@ const NavItem = ({ to, icon: Icon, label, badge }) => (
 export default function Sidebar({ pendingCount }) {
   const { profile, isAdmin, isApprover } = useAuth()
   const navigate = useNavigate()
+  const [showUserMenu, setShowUserMenu] = useState(false)
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -27,17 +29,15 @@ export default function Sidebar({ pendingCount }) {
   }
 
   return (
-    <aside style={{ width: 220, minHeight: '100vh', background: '#fff', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '20px 12px', position: 'fixed', left: 0, top: 0, bottom: 0, zIndex: 100, boxShadow: '2px 0 8px rgba(0,0,0,0.04)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 10px 20px', borderBottom: '1px solid var(--border)', marginBottom: 12 }}>
-        <div style={{ width: 34, height: 34, background: 'var(--accent-glow)', border: '1px solid rgba(0,87,184,0.2)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Beaker size={18} color="var(--accent)" />
-        </div>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.2, color: 'var(--text)' }}>Lab Reservations</div>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Eli Lilly</div>
-        </div>
+    <aside style={{ width: 230, minHeight: '100vh', background: '#fff', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '20px 12px', position: 'fixed', left: 0, top: 0, bottom: 0, zIndex: 100, boxShadow: '2px 0 8px rgba(0,0,0,0.04)' }}>
+
+      {/* Logo & App Name */}
+      <div style={{ padding: '4px 10px 20px', borderBottom: '1px solid var(--border)', marginBottom: 12 }}>
+        <img src="/lilly-logo.png" alt="Lilly" style={{ height: 32, marginBottom: 8 }} />
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', lineHeight: 1.3 }}>Lab Equipment Reservations</div>
       </div>
 
+      {/* Navigation */}
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: '4px 14px 6px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Main</div>
         <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" />
@@ -63,16 +63,36 @@ export default function Sidebar({ pendingCount }) {
         )}
       </nav>
 
-      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-        <div style={{ padding: '8px 10px', marginBottom: 4 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)' }}>{profile?.full_name || 'Loading...'}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2, textTransform: 'capitalize' }}>{profile?.role || 'viewer'}</div>
-        </div>
-        <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, transition: 'all 0.15s' }}
-          onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.background = 'rgba(192,57,43,0.06)' }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'none' }}>
-          <LogOut size={16} /> Sign Out
+      {/* User dropdown */}
+      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, position: 'relative' }}>
+        <button onClick={() => setShowUserMenu(!showUserMenu)}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 10px', borderRadius: 8, background: showUserMenu ? 'var(--bg-elevated)' : 'none', border: 'none', cursor: 'pointer', transition: 'all 0.15s' }}>
+          <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--accent-glow)', border: '1px solid rgba(208,33,42,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <User size={14} color="var(--accent)" />
+          </div>
+          <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile?.full_name || 'Loading...'}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'capitalize' }}>{profile?.role || 'viewer'}</div>
+          </div>
+          <ChevronDown size={14} color="var(--text-dim)" style={{ flexShrink: 0, transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
         </button>
+
+        {showUserMenu && (
+          <div style={{ position: 'absolute', bottom: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 -4px 20px rgba(0,0,0,0.1)', marginBottom: 4, overflow: 'hidden' }}>
+            <NavLink to="/account" onClick={() => setShowUserMenu(false)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', textDecoration: 'none', color: 'var(--text)', fontSize: 14, borderBottom: '1px solid var(--border)', background: '#fff' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
+              onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+              <User size={15} /> My Account
+            </NavLink>
+            <button onClick={handleLogout}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: 14 }}
+              onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+              <LogOut size={15} /> Sign Out
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   )
