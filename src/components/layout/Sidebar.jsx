@@ -1,8 +1,8 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
-import { LayoutDashboard, Calendar, Package, ClipboardList, Users, Upload, LogOut, Bell, Settings, ChevronDown, User } from 'lucide-react'
-import { useState } from 'react'
+import { LayoutDashboard, Calendar, Package, ClipboardList, Users, Upload, LogOut, Bell, Settings, ChevronDown, User, Key } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import LILLY_LOGO from '../../lib/logo'
 
 const NavItem = ({ to, icon: Icon, label, badge }) => (
@@ -23,6 +23,18 @@ export default function Sidebar({ pendingCount }) {
   const { profile, isAdmin, isApprover } = useAuth()
   const navigate = useNavigate()
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [resetCount, setResetCount] = useState(0)
+
+  useEffect(() => {
+    if (!isAdmin) return
+    async function fetchResets() {
+      const { count } = await supabase.from('password_reset_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending')
+      setResetCount(count || 0)
+    }
+    fetchResets()
+    const channel = supabase.channel('reset-requests').on('postgres_changes', { event: '*', schema: 'public', table: 'password_reset_requests' }, fetchResets).subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [isAdmin])
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -34,7 +46,6 @@ export default function Sidebar({ pendingCount }) {
 
       <div style={{ padding: '4px 10px 20px', borderBottom: '1px solid var(--border)', marginBottom: 12 }}>
         <img src={LILLY_LOGO} alt="Lilly" style={{ height: 44, objectFit: 'contain', display: 'block', marginBottom: 8 }} />
-        </div>
         <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', lineHeight: 1.3 }}>Lab Equipment Reservations</div>
       </div>
 
@@ -59,6 +70,7 @@ export default function Sidebar({ pendingCount }) {
             <NavItem to="/admin/bookings" icon={ClipboardList} label="All Bookings" />
             <NavItem to="/admin/users" icon={Users} label="Users" />
             <NavItem to="/admin/import" icon={Upload} label="CSV Import" />
+            <NavItem to="/admin/password-resets" icon={Key} label="Password Resets" badge={resetCount > 0 ? resetCount : null} />
           </>
         )}
       </nav>
