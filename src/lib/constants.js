@@ -20,29 +20,27 @@ export const BOOKING_TYPES = {
   MULTI_DAY: 'multi_day',
 }
 
-export const TIME_SLOTS = [
-  '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
-  '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
-  '18:00', '19:00', '20:00',
-]
+// Generate every 15-minute increment from 6:00 AM to 8:00 PM
+function generateTimeSlots() {
+  const slots = []
+  for (let h = 6; h <= 20; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      if (h === 20 && m > 0) break // stop at 8:00 PM
+      const hh = String(h).padStart(2, '0')
+      const mm = String(m).padStart(2, '0')
+      const value = `${hh}:${mm}`
+      const period = h < 12 ? 'AM' : 'PM'
+      const displayH = h > 12 ? h - 12 : h === 0 ? 12 : h
+      const label = `${displayH}:${mm} ${period}`
+      slots.push({ value, label })
+    }
+  }
+  return slots
+}
 
-export const TIME_SLOTS_AMPM = [
-  { value: '06:00', label: '6:00 AM' },
-  { value: '07:00', label: '7:00 AM' },
-  { value: '08:00', label: '8:00 AM' },
-  { value: '09:00', label: '9:00 AM' },
-  { value: '10:00', label: '10:00 AM' },
-  { value: '11:00', label: '11:00 AM' },
-  { value: '12:00', label: '12:00 PM' },
-  { value: '13:00', label: '1:00 PM' },
-  { value: '14:00', label: '2:00 PM' },
-  { value: '15:00', label: '3:00 PM' },
-  { value: '16:00', label: '4:00 PM' },
-  { value: '17:00', label: '5:00 PM' },
-  { value: '18:00', label: '6:00 PM' },
-  { value: '19:00', label: '7:00 PM' },
-  { value: '20:00', label: '8:00 PM' },
-]
+export const TIME_SLOTS_AMPM = generateTimeSlots()
+
+export const TIME_SLOTS = TIME_SLOTS_AMPM.map(t => t.value)
 
 export const CSV_COLUMNS = {
   asset_tag: ['asset_tag', 'asset tag', 'id', 'equipment_id', 'asset id'],
