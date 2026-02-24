@@ -4,7 +4,6 @@ import { ToastProvider } from './hooks/useToast'
 import LoginPage from './components/auth/LoginPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import AppLayout from './components/layout/AppLayout'
-import Dashboard from './pages/Dashboard'
 import EquipmentList from './pages/EquipmentList'
 import CalendarView from './pages/CalendarView'
 import MyBookings from './pages/MyBookings'
@@ -40,11 +39,10 @@ function AppRoutes() {
   const { user } = useAuth()
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginPage />} />
+      <Route path="/login" element={user ? <Navigate to="/calendar" /> : <LoginPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
+      <Route path="/" element={<Navigate to={user ? "/calendar" : "/login"} />} />
       <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
-        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/equipment" element={<EquipmentList />} />
         <Route path="/calendar" element={<CalendarView />} />
         <Route path="/my-bookings" element={<MyBookings />} />
