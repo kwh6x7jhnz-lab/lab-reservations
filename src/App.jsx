@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { ToastProvider } from './hooks/useToast'
 import LoginPage from './components/auth/LoginPage'
+import ResetPasswordPage from './components/auth/ResetPasswordPage'
 import AppLayout from './components/layout/AppLayout'
 import Dashboard from './pages/Dashboard'
 import EquipmentList from './pages/EquipmentList'
@@ -16,9 +17,19 @@ import CSVImport from './pages/admin/CSVImport'
 import PasswordResets from './pages/admin/PasswordResets'
 
 function RequireAuth({ children }) {
-  const { user, loading } = useAuth()
-  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}><div className="spinner" style={{ width: 40, height: 40 }} /></div>
+  const { user, profile, loading, mustChangePassword } = useAuth()
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+      <div className="spinner" style={{ width: 40, height: 40 }} />
+    </div>
+  )
+
   if (!user) return <Navigate to="/login" replace />
+
+  // If profile is loaded and must_change_password is set, force the reset screen
+  if (profile && mustChangePassword) return <Navigate to="/reset-password" replace />
+
   return children
 }
 
@@ -35,6 +46,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
       <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
         <Route path="/dashboard" element={<Dashboard />} />
