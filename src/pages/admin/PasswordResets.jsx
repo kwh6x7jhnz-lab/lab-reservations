@@ -42,13 +42,20 @@ export default function PasswordResets() {
       const { data: profile } = await supabase.from('profiles').select('id').ilike('email', request.email).single()
       if (!profile) throw new Error('Could not find user account for this email')
 
+      // Set must_change_password flag
       const { error } = await supabase.from('profiles').update({ must_change_password: true }).eq('id', profile.id)
       if (error) throw error
+
+      // Send the password reset email so the user gets notified
+      const { error: emailError } = await supabase.auth.resetPasswordForEmail(request.email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      })
+      if (emailError) throw emailError
 
       await supabase.from('password_reset_requests').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', request.id)
 
       setRequests(prev => prev.filter(r => r.id !== request.id))
-      toast(`Reset approved for ${request.displayName}. They will be prompted to set a new password on next login.`, 'success')
+      toast(`Reset email sent to ${request.displayName}.`, 'success')
     } catch (err) {
       toast(err.message, 'error')
     }
@@ -92,13 +99,13 @@ export default function PasswordResets() {
                 {r.message && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8, fontStyle: 'italic', background: 'var(--bg-elevated)', padding: '6px 10px', borderRadius: 6 }}>"{r.message}"</div>}
                 <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                   <button className="btn btn-primary btn-sm" onClick={() => approveReset(r)} disabled={processing === r.id}>
-                    {processing === r.id ? <div className="spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> : <><Key size={14} /> Approve Reset</>}
+                    {processing === r.id ? <div className="spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> : <><Key size={14} /> Approve & Send Email</>}
                   </button>
                   <button className="btn btn-secondary btn-sm" onClick={() => dismissRequest(r.id)} disabled={processing === r.id}>
                     <X size={14} /> Dismiss
                   </button>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>ℹ️ User will be prompted to set a new password on their next login</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>ℹ️ User will receive an email with a link to set their new password</div>
               </div>
             </div>
           ))}
