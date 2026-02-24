@@ -105,7 +105,7 @@ export default function PasswordResets() {
                     <X size={14} /> Dismiss
                   </button>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>ℹ️ User will receive an email with a link to set their new password</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>User will receive an email with a link to set their new password</div>
               </div>
             </div>
           ))}
