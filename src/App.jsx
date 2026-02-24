@@ -12,7 +12,6 @@ import AdminEquipment from './pages/admin/AdminEquipment'
 import AdminBookings from './pages/admin/AdminBookings'
 import AdminUsers from './pages/admin/AdminUsers'
 import AccountPage from './pages/AccountPage'
-import CSVImport from './pages/admin/CSVImport'
 import PasswordResets from './pages/admin/PasswordResets'
 import Analytics from './pages/Analytics'
 
@@ -52,7 +51,6 @@ function AppRoutes() {
         <Route path="/admin/equipment" element={<RequireRole role="admin"><AdminEquipment /></RequireRole>} />
         <Route path="/admin/bookings" element={<RequireRole role="admin"><AdminBookings /></RequireRole>} />
         <Route path="/admin/users" element={<RequireRole role="admin"><AdminUsers /></RequireRole>} />
-        <Route path="/admin/import" element={<RequireRole role="admin"><CSVImport /></RequireRole>} />
         <Route path="/admin/password-resets" element={<RequireRole role="admin"><PasswordResets /></RequireRole>} />
       </Route>
     </Routes>
