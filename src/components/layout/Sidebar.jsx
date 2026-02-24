@@ -51,7 +51,6 @@ export default function Sidebar({ pendingCount }) {
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: '4px 14px 6px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Main</div>
-        <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" />
         <NavItem to="/equipment" icon={Package} label="Equipment" />
         <NavItem to="/calendar" icon={Calendar} label="Calendar" />
         <NavItem to="/my-bookings" icon={ClipboardList} label="My Bookings" />
@@ -68,8 +67,8 @@ export default function Sidebar({ pendingCount }) {
           <>
             <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: '12px 14px 6px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Admin</div>
             <NavItem to="/admin/equipment" icon={Settings} label="Manage Equipment" />
-            <NavItem to="/admin/bookings" icon={ClipboardList} label="All Bookings" />
-            <NavItem to="/admin/users" icon={Users} label="Users" />
+            <NavItem to="/admin/bookings" icon={ClipboardList} label="Manage Bookings" />
+            <NavItem to="/admin/users" icon={Users} label="Manage Users" />
             <NavItem to="/admin/import" icon={Upload} label="CSV Import" />
             <NavItem to="/admin/password-resets" icon={Key} label="Password Resets" badge={resetCount > 0 ? resetCount : null} />
           </>
