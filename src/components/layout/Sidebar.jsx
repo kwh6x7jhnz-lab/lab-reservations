@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
-import { LayoutDashboard, Calendar, Package, ClipboardList, Users, Upload, LogOut, Bell, Settings, ChevronDown, User, Key } from 'lucide-react'
+import { LayoutDashboard, Calendar, Package, ClipboardList, Users, Upload, LogOut, Bell, Settings, ChevronDown, User, Key, BarChart2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import LILLY_LOGO from '../../lib/logo'
 
@@ -55,6 +55,7 @@ export default function Sidebar({ pendingCount }) {
         <NavItem to="/equipment" icon={Package} label="Equipment" />
         <NavItem to="/calendar" icon={Calendar} label="Calendar" />
         <NavItem to="/my-bookings" icon={ClipboardList} label="My Bookings" />
+        <NavItem to="/analytics" icon={BarChart2} label="Analytics" />
 
         {isApprover && (
           <>
