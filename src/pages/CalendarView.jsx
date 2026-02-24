@@ -33,7 +33,7 @@ function getTimeFromY(y, date) {
 
 export default function CalendarView() {
   const { profile, isAdmin } = useAuth()
-  const [view, setView] = useState('month')
+  const [view, setView] = useState('day')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [bookings, setBookings] = useState([])
   const [selectedDay, setSelectedDay] = useState(null)
@@ -47,6 +47,7 @@ export default function CalendarView() {
   const [selectedEquipmentForNew, setSelectedEquipmentForNew] = useState(null)
   const [showNewBookingPanel, setShowNewBookingPanel] = useState(false)
   const [equipmentSearch, setEquipmentSearch] = useState('')
+  const [editingBooking, setEditingBooking] = useState(null)
   const dragRef = useRef(null)
   const [dragState, setDragState] = useState(null)
 
@@ -136,6 +137,18 @@ export default function CalendarView() {
     setShowNewBookingPanel(true)
   }
 
+  function handleBookingClick(b, e) {
+    e.stopPropagation()
+    // Owner can always edit; admins can edit any booking
+    if (b.user_id === profile?.id || isAdmin) {
+      setEditingBooking(b)
+    }
+  }
+
+  function refreshBookings() {
+    setCurrentDate(d => new Date(d))
+  }
+
   const filteredEquipmentOptions = equipmentOptions.filter(e =>
     !equipmentSearch || e.name.toLowerCase().includes(equipmentSearch.toLowerCase()) || e.asset_tag?.toLowerCase().includes(equipmentSearch.toLowerCase())
   )
@@ -201,7 +214,9 @@ export default function CalendarView() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {dayBookings.slice(0, 2).map(b => (
-                    <div key={b.id} style={{ fontSize: 11, padding: '2px 5px', borderRadius: 4, background: STATUS_BG[b.status], color: STATUS_COLORS[b.status], overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontWeight: 500 }}>
+                    <div key={b.id}
+                      onClick={e => handleBookingClick(b, e)}
+                      style={{ fontSize: 11, padding: '2px 5px', borderRadius: 4, background: STATUS_BG[b.status], color: STATUS_COLORS[b.status], overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontWeight: 500, cursor: (b.user_id === profile?.id || isAdmin) ? 'pointer' : 'default', border: (b.user_id === profile?.id || isAdmin) ? '1px solid ' + STATUS_COLORS[b.status] + '60' : 'none' }}>
                       {format(new Date(b.start_time), 'h:mma')} {b.equipment?.name}
                     </div>
                   ))}
@@ -261,11 +276,14 @@ export default function CalendarView() {
                 </div>
               )}
               {dayBookings.map(b => (
-                <div key={b.id} style={{ position: 'absolute', top: getBookingTop(b.start_time), left: 4, right: 4, height: getBookingHeight(b.start_time, b.end_time), background: STATUS_BG[b.status], border: '1px solid ' + STATUS_COLORS[b.status] + '60', borderLeft: '3px solid ' + STATUS_COLORS[b.status], borderRadius: 6, padding: '3px 6px', overflow: 'hidden', zIndex: 3, cursor: 'default' }}
-                  onMouseDown={e => e.stopPropagation()}>
+                <div key={b.id}
+                  style={{ position: 'absolute', top: getBookingTop(b.start_time), left: 4, right: 4, height: getBookingHeight(b.start_time, b.end_time), background: STATUS_BG[b.status], border: '1px solid ' + STATUS_COLORS[b.status] + '60', borderLeft: '3px solid ' + STATUS_COLORS[b.status], borderRadius: 6, padding: '3px 6px', overflow: 'hidden', zIndex: 3, cursor: (b.user_id === profile?.id || isAdmin) ? 'pointer' : 'default' }}
+                  onMouseDown={e => e.stopPropagation()}
+                  onClick={e => handleBookingClick(b, e)}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: STATUS_COLORS[b.status], overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{b.equipment?.name}</div>
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>{format(new Date(b.start_time), 'h:mm')}–{format(new Date(b.end_time), 'h:mma')}</div>
                   {getBookingHeight(b.start_time, b.end_time) > 40 && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{b.profiles?.full_name}</div>}
+                  {(b.user_id === profile?.id || isAdmin) && <div style={{ fontSize: 9, color: STATUS_COLORS[b.status], marginTop: 1, opacity: 0.8 }}>click to edit</div>}
                 </div>
               ))}
               <div style={{ position: 'absolute', inset: 0, zIndex: 1 }} onClick={e => {
@@ -355,15 +373,18 @@ export default function CalendarView() {
                 <div style={{ fontSize: 13 }}>No bookings this day</div>
               </div>
             ) : bookingsOnDay(selectedDay).map(b => (
-              <div key={b.id} style={{ padding: '12px', borderRadius: 8, background: STATUS_BG[b.status], border: '1px solid ' + STATUS_COLORS[b.status] + '40' }}>
+              <div key={b.id}
+                onClick={() => (b.user_id === profile?.id || isAdmin) && setEditingBooking(b)}
+                style={{ padding: '12px', borderRadius: 8, background: STATUS_BG[b.status], border: '1px solid ' + STATUS_COLORS[b.status] + '40', cursor: (b.user_id === profile?.id || isAdmin) ? 'pointer' : 'default' }}>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{b.equipment?.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{b.profiles?.full_name || 'Unknown'}</div>
                 <div style={{ fontSize: 11, fontFamily: 'Space Mono', color: 'var(--text-dim)', marginTop: 4 }}>
                   {format(new Date(b.start_time), 'h:mm a')} – {format(new Date(b.end_time), 'h:mm a')}
                 </div>
                 {b.equipment?.location && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>📍 {b.equipment.location}</div>}
-                <div style={{ marginTop: 6 }}>
+                <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: STATUS_COLORS[b.status] + '20', color: STATUS_COLORS[b.status], border: '1px solid ' + STATUS_COLORS[b.status] + '40', textTransform: 'capitalize' }}>{b.status}</span>
+                  {(b.user_id === profile?.id || isAdmin) && <span style={{ fontSize: 11, color: 'var(--accent)' }}>click to edit</span>}
                 </div>
               </div>
             ))}
@@ -377,7 +398,7 @@ export default function CalendarView() {
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />{status}
           </div>
         ))}
-        <span style={{ color: 'var(--text-dim)', marginLeft: 8 }}>· Click or drag on week/day view to create a booking</span>
+        <span style={{ color: 'var(--text-dim)', marginLeft: 8 }}>· Click or drag on week/day view to create a booking · Click your booking to edit</span>
       </div>
 
       {showNewBookingPanel && (
@@ -429,7 +450,18 @@ export default function CalendarView() {
           onClose={() => {
             setSelectedEquipmentForNew(null)
             setBookingModalData(null)
-            setCurrentDate(d => new Date(d))
+            refreshBookings()
+          }}
+        />
+      )}
+
+      {editingBooking && (
+        <BookingModal
+          equipment={editingBooking.equipment}
+          editBooking={editingBooking}
+          onClose={() => {
+            setEditingBooking(null)
+            refreshBookings()
           }}
         />
       )}
