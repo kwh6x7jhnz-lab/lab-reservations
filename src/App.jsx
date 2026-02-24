@@ -15,6 +15,7 @@ import AdminUsers from './pages/admin/AdminUsers'
 import AccountPage from './pages/AccountPage'
 import CSVImport from './pages/admin/CSVImport'
 import PasswordResets from './pages/admin/PasswordResets'
+import Analytics from './pages/Analytics'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -47,6 +48,7 @@ function AppRoutes() {
         <Route path="/equipment" element={<EquipmentList />} />
         <Route path="/calendar" element={<CalendarView />} />
         <Route path="/my-bookings" element={<MyBookings />} />
+        <Route path="/analytics" element={<Analytics />} />
         <Route path="/account" element={<AccountPage />} />
         <Route path="/approvals" element={<RequireRole role="approver"><ApprovalQueue /></RequireRole>} />
         <Route path="/admin/equipment" element={<RequireRole role="admin"><AdminEquipment /></RequireRole>} />
