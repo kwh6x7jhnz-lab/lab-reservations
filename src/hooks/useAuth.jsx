@@ -30,57 +30,7 @@ export function AuthProvider({ children }) {
     setLoading(false)
   }
 
-  async function signIn(email, password) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return { error }
-  }
-
-  async function signUp(email, password, fullName) {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: fullName } }
-    })
-    return { error }
-  }
-
-  async function signOut() {
-    await supabase.auth.signOut()
-  }
-
-  async function sendPasswordReset(email) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`
-    })
-    return { error }
-  }
-
-  async function updatePassword(newPassword) {
-    const { error } = await supabase.auth.updateUser({ password: newPassword })
-    if (!error && user) {
-      // Clear the must_change_password flag
-      await supabase
-        .from('profiles')
-        .update({ must_change_password: false })
-        .eq('id', user.id)
-      await fetchProfile(user.id)
-    }
-    return { error }
-  }
-
-  const value = {
-    user,
-    profile,
-    loading,
-    mustChangePassword: profile?.must_change_password === true,
-    isAdmin: profile?.role === 'admin',
-    isApprover: profile?.role === 'admin' || profile?.role === 'approver',
-    signIn,
-    signUp,
-    signOut,
-    sendPasswordReset,
-    updatePassword,
-  }
+  const value = { user, profile, loading, isAdmin: profile?.role === 'admin', isApprover: profile?.role === 'admin' || profile?.role === 'approver' }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
