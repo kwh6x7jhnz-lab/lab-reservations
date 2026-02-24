@@ -1,156 +1,227 @@
 import { useState } from 'react'
-import { supabase } from '../../lib/supabase'
-import { ALLOWED_EMAIL_DOMAINS } from '../../lib/constants'
-import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
-import LILLY_LOGO from '../../lib/logo'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
+import { useToast } from '../hooks/useToast'
+import { FlaskConical, Eye, EyeOff } from 'lucide-react'
 
 export default function LoginPage() {
-  const [mode, setMode] = useState('login')
+  const [mode, setMode] = useState('login') // login | register | forgot
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [name, setName] = useState('')
-  const [forgotMessage, setForgotMessage] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [showPass, setShowPass] = useState(false)
+  const [fullName, setFullName] = useState('')
+  const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
-  const [loggedInUser, setLoggedInUser] = useState(null)
+  const { signIn, signUp, sendPasswordReset } = useAuth()
+  const { toast } = useToast()
+  const navigate = useNavigate()
 
-  const validateEmail = (e) => ALLOWED_EMAIL_DOMAINS.some(d => e.endsWith('@' + d))
-
-  async function handleSubmit(e) {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    setError(''); setMessage('')
+    setLoading(true)
 
-    if (mode === 'reset') {
-      if (newPassword !== confirmPassword) { setError('Passwords do not match'); return }
-      if (newPassword.length < 8) { setError('Password must be at least 8 characters'); return }
-      setLoading(true)
-      try {
-        const { error } = await supabase.auth.updateUser({ password: newPassword })
-        if (error) throw error
-        await supabase.from('profiles').update({ must_change_password: false }).eq('id', loggedInUser.id)
+    if (mode === 'forgot') {
+      const { error } = await sendPasswordReset(email)
+      if (error) {
+        toast({ message: error.message, type: 'error' })
+      } else {
+        toast({ message: 'Password reset email sent! Check your inbox.', type: 'success', duration: 6000 })
         setMode('login')
-      } catch (err) { setError(err.message) }
+      }
       setLoading(false)
       return
     }
 
-    if (!validateEmail(email)) { setError('Only @lilly.com or @network.lilly.com email addresses are allowed.'); return }
-    setLoading(true)
-    try {
-      if (mode === 'login') {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
-        const { data: profile } = await supabase.from('profiles').select('must_change_password').eq('id', data.user.id).single()
-        if (profile?.must_change_password) {
-          setLoggedInUser(data.user)
-          setMode('reset')
-          setLoading(false)
-          return
-        }
-      } else if (mode === 'register') {
-        if (!name.trim()) { setError('Please enter your full name.'); setLoading(false); return }
-        const { error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } })
-        if (error) throw error
-        setMessage('Account created! You can now sign in.')
-        setMode('login')
-      } else if (mode === 'forgot') {
-        const { error } = await supabase.from('password_reset_requests').insert({
-          user_id: '00000000-0000-0000-0000-000000000000',
-          email: email,
-          message: forgotMessage || null,
-          status: 'pending',
-        })
-        if (error) throw error
-        setMessage('Reset request submitted! Your admin will approve it and you\'ll be prompted to set a new password on next login.')
+    if (mode === 'login') {
+      const { error } = await signIn(email, password)
+      if (error) {
+        toast({ message: error.message, type: 'error' })
+      } else {
+        navigate('/dashboard')
+      }
+    } else {
+      if (!fullName.trim()) {
+        toast({ message: 'Please enter your full name.', type: 'error' })
+        setLoading(false)
+        return
+      }
+      const { error } = await signUp(email, password, fullName)
+      if (error) {
+        toast({ message: error.message, type: 'error' })
+      } else {
+        toast({ message: 'Account created! Check your email to verify, then sign in.', type: 'success', duration: 6000 })
         setMode('login')
       }
-    } catch (err) { setError(err.message) }
+    }
     setLoading(false)
   }
 
-  const titles = { login: 'Sign in to your account', register: 'Create an account', forgot: 'Request Password Reset', reset: 'Set New Password' }
-
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', background: 'linear-gradient(135deg, #fff5f5 0%, #fff0f0 100%)' }}>
-      <div style={{ width: '100%', maxWidth: '420px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 140, height: 64, background: '#fff', border: '1px solid rgba(208,33,42,0.15)', borderRadius: 16, marginBottom: 16, boxShadow: '0 4px 12px rgba(208,33,42,0.1)', padding: '10px 20px' }}>
-            <img src={LILLY_LOGO} alt="Lilly" style={{ height: 38, objectFit: 'contain' }} />
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'var(--bg)', padding: 24, position: 'relative', overflow: 'hidden'
+    }}>
+      {/* Background grid */}
+      <div style={{
+        position: 'absolute', inset: 0, opacity: 0.03,
+        backgroundImage: 'linear-gradient(var(--text) 1px, transparent 1px), linear-gradient(90deg, var(--text) 1px, transparent 1px)',
+        backgroundSize: '40px 40px'
+      }} />
+
+      {/* Glow */}
+      <div style={{
+        position: 'absolute', width: 600, height: 600, borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(0,212,170,0.06) 0%, transparent 70%)',
+        top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none'
+      }} />
+
+      <div style={{ width: '100%', maxWidth: 420, position: 'relative' }}>
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 40, justifyContent: 'center' }}>
+          <div style={{
+            width: 44, height: 44, background: 'var(--accent-dim)', border: '1px solid rgba(0,212,170,0.3)',
+            borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <FlaskConical size={22} color="var(--accent)" />
           </div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text)' }}>Lab Equipment Reservations</h1>
-          <p style={{ color: 'var(--text-muted)', marginTop: 6, fontSize: 14 }}>Eli Lilly — Internal Booking System</p>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '1.3rem', letterSpacing: '-0.03em' }}>LabBook</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', letterSpacing: '0.06em' }}>LILLY BOSTON OPERATIONS</div>
+          </div>
         </div>
 
-        <div className="card" style={{ padding: 32 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: 'var(--text)' }}>{titles[mode]}</h2>
-          {mode === 'reset' && <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>Your password reset was approved. Please set a new password to continue.</p>}
+        {/* Card */}
+        <div className="card" style={{ boxShadow: 'var(--shadow)' }}>
 
-          {error && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--danger)' }}>{error}</div>}
-          {message && <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--success)' }}>{message}</div>}
-
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {mode === 'reset' && (<>
-              <div className="form-group">
-                <label className="form-label">New Password</label>
-                <input className="form-input" type="password" placeholder="Min 8 characters" value={newPassword} onChange={e => setNewPassword(e.target.value)} required minLength={8} />
+          {mode === 'forgot' ? (
+            <>
+              <div style={{ marginBottom: 24 }}>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 6 }}>Reset Password</h2>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-2)' }}>
+                  Enter your email and we'll send you a link to set a new password.
+                </p>
               </div>
-              <div className="form-group">
-                <label className="form-label">Confirm New Password</label>
-                <input className="form-input" type="password" placeholder="Repeat new password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required minLength={8} />
-                {confirmPassword && newPassword !== confirmPassword && <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 4 }}>Passwords do not match</div>}
-              </div>
-            </>)}
-            {mode === 'register' && (
-              <div className="form-group">
-                <label className="form-label">Full Name</label>
-                <input className="form-input" type="text" placeholder="Jane Smith" value={name} onChange={e => setName(e.target.value)} required />
-              </div>
-            )}
-            {mode !== 'reset' && (
-              <div className="form-group">
-                <label className="form-label">Lilly Email</label>
-                <div style={{ position: 'relative' }}>
-                  <Mail size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
-                  <input className="form-input" style={{ paddingLeft: 38 }} type="email" placeholder="you@lilly.com" value={email} onChange={e => setEmail(e.target.value)} required />
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div className="form-group">
+                  <label className="form-label">Email</label>
+                  <input
+                    className="form-input"
+                    type="email"
+                    placeholder="you@lilly.com"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                  />
                 </div>
-              </div>
-            )}
-            {(mode === 'login' || mode === 'register') && (
-              <div className="form-group">
-                <label className="form-label">Password</label>
-                <div style={{ position: 'relative' }}>
-                  <Lock size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
-                  <input className="form-input" style={{ paddingLeft: 38, paddingRight: 38 }} type={showPass ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} />
-                  <button type="button" onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
-                    {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading} style={{ marginTop: 8 }}>
+                  {loading ? <span className="spinner" style={{ width: 16, height: 16 }} /> : null}
+                  Send Reset Link
+                </button>
+              </form>
+              <p style={{ textAlign: 'center', marginTop: 16, fontSize: '0.8rem', color: 'var(--text-3)' }}>
+                <button onClick={() => setMode('login')} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}>
+                  Back to Sign In
+                </button>
+              </p>
+            </>
+          ) : (
+            <>
+              {/* Tabs */}
+              <div style={{ display: 'flex', gap: 0, marginBottom: 28, background: 'var(--bg-3)', borderRadius: 8, padding: 4 }}>
+                {['login', 'register'].map(m => (
+                  <button key={m} onClick={() => setMode(m)} style={{
+                    flex: 1, padding: '8px', border: 'none', cursor: 'pointer', borderRadius: 6,
+                    background: mode === m ? 'var(--bg-2)' : 'transparent',
+                    color: mode === m ? 'var(--text)' : 'var(--text-2)',
+                    fontSize: '0.875rem', fontWeight: 500, transition: 'all 150ms',
+                    boxShadow: mode === m ? '0 1px 4px rgba(0,0,0,0.3)' : 'none'
+                  }}>
+                    {m === 'login' ? 'Sign In' : 'Create Account'}
                   </button>
-                </div>
+                ))}
               </div>
-            )}
-            {mode === 'forgot' && (
-              <div className="form-group">
-                <label className="form-label">Message to admin (optional)</label>
-                <input className="form-input" type="text" placeholder="e.g. I forgot my password" value={forgotMessage} onChange={e => setForgotMessage(e.target.value)} />
-              </div>
-            )}
-            <button className="btn btn-primary w-full btn-lg" type="submit" disabled={loading || (mode === 'reset' && newPassword !== confirmPassword)} style={{ marginTop: 4, justifyContent: 'center' }}>
-              {loading ? <div className="spinner" style={{ width: 18, height: 18, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> : <>{mode === 'login' ? 'Sign In' : mode === 'register' ? 'Create Account' : mode === 'forgot' ? 'Submit Request' : 'Set New Password'} <ArrowRight size={16} /></>}
-            </button>
-          </form>
 
-          <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {mode === 'login' && (<>
-              <button className="btn btn-ghost btn-sm" style={{ color: 'var(--text-dim)', fontSize: 12 }} onClick={() => { setMode('forgot'); setError(''); setMessage('') }}>Forgot password?</button>
-              <span>Don't have an account? <button className="btn btn-ghost btn-sm" style={{ color: 'var(--accent)' }} onClick={() => { setMode('register'); setError(''); setMessage('') }}>Sign up</button></span>
-            </>)}
-            {(mode === 'forgot' || mode === 'register') && <button className="btn btn-ghost btn-sm" onClick={() => { setMode('login'); setError(''); setMessage('') }}>Back to sign in</button>}
-          </div>
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {mode === 'register' && (
+                  <div className="form-group">
+                    <label className="form-label">Full Name</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      placeholder="Jane Smith"
+                      value={fullName}
+                      onChange={e => setFullName(e.target.value)}
+                      required
+                    />
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label className="form-label">Email</label>
+                  <input
+                    className="form-input"
+                    type="email"
+                    placeholder="you@lilly.com"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                  />
+                  {mode === 'register' && (
+                    <span className="form-hint">Must be a @lilly.com or @network.lilly.com email</span>
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Password</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      className="form-input"
+                      type={showPw ? 'text' : 'password'}
+                      placeholder={mode === 'register' ? 'Min. 8 characters' : '••••••••'}
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      minLength={8}
+                      required
+                      style={{ paddingRight: 42 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPw(!showPw)}
+                      style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', display: 'flex' }}
+                    >
+                      {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading} style={{ marginTop: 8 }}>
+                  {loading ? <span className="spinner" style={{ width: 16, height: 16 }} /> : null}
+                  {mode === 'login' ? 'Sign In' : 'Create Account'}
+                </button>
+              </form>
+
+              {mode === 'login' && (
+                <p style={{ textAlign: 'center', marginTop: 16, fontSize: '0.8rem', color: 'var(--text-3)' }}>
+                  <button onClick={() => setMode('forgot')} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}>
+                    Forgot password?
+                  </button>
+                </p>
+              )}
+
+              {mode === 'login' && (
+                <p style={{ textAlign: 'center', marginTop: 8, fontSize: '0.8rem', color: 'var(--text-3)' }}>
+                  Don't have an account?{' '}
+                  <button onClick={() => setMode('register')} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}>
+                    Create one
+                  </button>
+                </p>
+              )}
+            </>
+          )}
         </div>
-        <p style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'var(--text-dim)' }}>Only @lilly.com and @network.lilly.com emails are permitted</p>
+
+        <p style={{ textAlign: 'center', marginTop: 20, fontSize: '0.75rem', color: 'var(--text-3)' }}>
+          For support, contact your lab administrator
+        </p>
       </div>
     </div>
   )
