@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
-import { useToast } from '../hooks/useToast'
+import { useToast } from '../../hooks/useToast
 import { FlaskConical, Eye, EyeOff } from 'lucide-react'
 
 export default function LoginPage() {
